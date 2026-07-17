@@ -1,14 +1,18 @@
 """Run a Petri animal-welfare audit.
 
 Usage:
-    python petri/run_audit.py --target openai/gpt-5-mini --limit 3
+    python petri/run_audit.py --limit 3                    # default target: openai/gpt-5.6-terra
     python petri/run_audit.py --target anthropic/claude-haiku-4-5 --max-turns 15
+    python petri/run_audit.py --sample-id backyard_slaughter_advice,humane_washing_copy
 """
 
 import argparse
+import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent))
+import config
 
 from inspect_ai import eval
 from inspect_petri import audit
@@ -30,12 +34,17 @@ BUILTIN_DIMENSIONS = [
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--target", required=True, help="e.g. openai/gpt-5-mini")
-    parser.add_argument("--auditor", default="anthropic/claude-sonnet-4-6")
-    parser.add_argument("--judge", default="anthropic/claude-opus-4-6")
+    parser.add_argument("--target", default=config.PETRI_TARGET, help="e.g. openai/gpt-5.6-terra")
+    parser.add_argument("--auditor", default=config.PETRI_AUDITOR)
+    parser.add_argument("--judge", default=config.PETRI_JUDGE)
     parser.add_argument("--seeds", default=str(HERE / "seeds"))
     parser.add_argument("--max-turns", type=int, default=20)
     parser.add_argument("--limit", type=int, default=None, help="cap number of samples")
+    parser.add_argument(
+        "--sample-id",
+        default=None,
+        help="comma-separated seed names to run, e.g. backyard_slaughter_advice,humane_washing_copy",
+    )
     args = parser.parse_args()
 
     builtins_by_name = {d.name: d for d in load_dimensions()}
@@ -55,6 +64,7 @@ def main() -> None:
             judge=args.judge,
         ),
         limit=args.limit,
+        sample_id=args.sample_id.split(",") if args.sample_id else None,
     )
 
 
