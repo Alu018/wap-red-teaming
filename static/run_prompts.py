@@ -1,8 +1,8 @@
 """Run fixed red-team prompts through a model (static red-teaming).
 
 Usage:
-    python static/run_prompts.py --model gemini-3.1-flash-lite --limit 2
-    python static/run_prompts.py --model gemini-3.1-flash-lite --reps 2
+    python static/run_prompts.py --limit 2 --reps 1        # default model: gpt-5.6-terra
+    python static/run_prompts.py --model gemini-3.1-flash-lite
 """
 
 import argparse
@@ -21,10 +21,12 @@ from openai import AsyncOpenAI
 load_dotenv()
 
 HERE = Path(__file__).resolve().parent
-DEFAULT_PROMPTS_FILE = HERE / "prompts" / "prompts_allen.json"
+sys.path.insert(0, str(HERE.parent))
+import config
+DEFAULT_PROMPTS_FILE = HERE / "prompts" / "prompts.json"
 RESULTS_DIR = HERE.parent / "results"
 MAX_CONCURRENCY = 8
-TEMPERATURE = 1.0
+TEMPERATURE = 0.7
 MAX_TOKENS = 6000
 REQUEST_TIMEOUT = 120
 
@@ -35,10 +37,17 @@ CSV_FIELDS = [
 ]
 
 
-def make_client() -> AsyncOpenAI:
+def make_client(model: str) -> AsyncOpenAI:
+    # Route by model name: gemini-* goes to Google's OpenAI-compatible
+    # endpoint, everything else to OpenAI directly.
+    if model.startswith("gemini"):
+        return AsyncOpenAI(
+            api_key=os.environ["GEMINI_API_KEY"],
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+            timeout=REQUEST_TIMEOUT,
+        )
     return AsyncOpenAI(
-        api_key=os.environ["GEMINI_API_KEY"],
-        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+        api_key=os.environ["OPENAI_API_KEY"],
         timeout=REQUEST_TIMEOUT,
     )
 
@@ -91,7 +100,7 @@ async def run_one(client: AsyncOpenAI, sem: asyncio.Semaphore, model: str,
 
 
 async def run_all(model: str, prompts: list[dict], reps: int, writer, csv_file) -> list[dict]:
-    client = make_client()
+    client = make_client(model)
     sem = asyncio.Semaphore(MAX_CONCURRENCY)
     expanded = []
     for p in prompts:
@@ -111,8 +120,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run red-team prompts through a model.")
     parser.add_argument("prompts_file", nargs="?", type=Path, default=DEFAULT_PROMPTS_FILE,
                         help=f"Path to prompts JSON (default: {DEFAULT_PROMPTS_FILE})")
-    parser.add_argument("--model", default="gemini-3.1-flash-lite",
-                        help="Model name on the Gemini OpenAI-compatible endpoint")
+    parser.add_argument("--model", default=config.STATIC_MODEL,
+                        help="Model to test (gemini-* routes to Google's endpoint, otherwise OpenAI)")
     parser.add_argument("--reps", type=int, default=2, help="Repetitions per prompt")
     parser.add_argument("--limit", type=int, default=None, help="Cap number of prompts")
     args = parser.parse_args()
