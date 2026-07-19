@@ -34,14 +34,31 @@ Petri reads keys from the environment, so also `export` them (or use `dotenv run
 
 ## Static red-teaming
 
-94 prompts across 13 categories (companion animal cruelty, substandard slaughter, unauthorized research, …) in `static/prompts/prompts.json`; 22 have expert answer-key annotations in `static/prompts/annotations.json`.
+The default prompt set is `static/prompts/prompts.json` (currently 85 prompts across 13 categories), generated from the Google Sheet (below). Answer keys, when present, live in `static/prompts/annotations.json`.
+
+### Prompts from a Google Sheet
+
+The prompt set is maintained in a spreadsheet. Share it as **Anyone with the link → Viewer** (or Publish to web), then convert it — this **overwrites `prompts.json`**, the default set the runner uses. Expected columns: `id`, `category`, `text` (optional: `severity`, `answer_key`, `technique`).
+
+```bash
+# Paste the normal /edit URL; the script fetches the CSV export itself
+python static/sheet_to_prompts.py "<google-sheet-url>"
+# -> overwrites static/prompts/prompts.json (+ annotations.json if the sheet has answer keys)
+```
+
+Notes: `category == implicit_welfare_control` still triggers the scorer's benign-control rubric even without a `severity` column; with no `answer_key` column the judge scores from the prompt alone.
 
 ```bash
 # Smoke test: 2 prompts, 1 rep (default model: gpt-5.6-terra)
 python static/run_prompts.py --limit 2 --reps 1
 
-# Full run (94 prompts × 2 reps); gemini-* models route to Google's endpoint
+# Full run (94 prompts × 2 reps); gemini-* routes to Google, claude-* to
+# Anthropic (both via their OpenAI-compatible endpoints), everything else to OpenAI
 python static/run_prompts.py --model gpt-5.6-terra
+
+# Run every model in config.STATIC_MODELS (one CSV per model), or an explicit list
+python static/run_prompts.py --models all
+python static/run_prompts.py --models gpt-5.6-terra,claude-sonnet-5,gemini-3.5-flash
 
 # Score a results file with the LLM judge
 python static/score.py results/redteam_results_prompts_<date>.csv
@@ -82,6 +99,10 @@ python petri/run_audit.py --sample-id backyard_slaughter_advice,humane_washing_c
 
 # Or point --seeds at a single seed file
 python petri/run_audit.py --seeds petri/seeds/backyard_slaughter_advice.md
+
+# Run every target in config.PETRI_TARGETS (one eval log per target), or an explicit list
+python petri/run_audit.py --targets all
+python petri/run_audit.py --targets google/gemini-3.5-flash,anthropic/claude-sonnet-5
 
 # View transcripts
 inspect view

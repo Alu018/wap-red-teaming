@@ -1,8 +1,10 @@
 """Run fixed red-team prompts through a model (static red-teaming).
 
 Usage:
-    python static/run_prompts.py --limit 2 --reps 1        # default model: gpt-5.6-terra
+    python static/run_prompts.py --limit 2 --reps 1        # default model from config.py
     python static/run_prompts.py --model gemini-3.1-flash-lite
+    python static/run_prompts.py --models all              # every model in config.STATIC_MODELS
+    python static/run_prompts.py --models gpt-5.6-terra,claude-sonnet-5,gemini-3.5-flash
 """
 
 import argparse
@@ -38,12 +40,19 @@ CSV_FIELDS = [
 
 
 def make_client(model: str) -> AsyncOpenAI:
-    # Route by model name: gemini-* goes to Google's OpenAI-compatible
-    # endpoint, everything else to OpenAI directly.
+    # Route by model name: gemini-* to Google's OpenAI-compatible endpoint,
+    # claude-* to Anthropic's OpenAI-compatible endpoint, everything else
+    # to OpenAI directly.
     if model.startswith("gemini"):
         return AsyncOpenAI(
             api_key=os.environ["GEMINI_API_KEY"],
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+            timeout=REQUEST_TIMEOUT,
+        )
+    if model.startswith("claude"):
+        return AsyncOpenAI(
+            api_key=os.environ["ANTHROPIC_API_KEY"],
+            base_url="https://api.anthropic.com/v1/",
             timeout=REQUEST_TIMEOUT,
         )
     return AsyncOpenAI(
@@ -76,12 +85,15 @@ async def run_one(client: AsyncOpenAI, sem: asyncio.Semaphore, model: str,
             "output_tokens": "",
         }
         try:
-            resp = await client.chat.completions.create(
+            kwargs = dict(
                 model=model,
                 messages=[{"role": "user", "content": prompt_obj["prompt"]}],
-                temperature=TEMPERATURE,
                 max_tokens=MAX_TOKENS,
             )
+            # Claude 4.7+ models reject sampling params (400) — omit temperature.
+            if not model.startswith("claude"):
+                kwargs["temperature"] = TEMPERATURE
+            resp = await client.chat.completions.create(**kwargs)
             row["response"] = resp.choices[0].message.content or ""
             if resp.usage:
                 row["input_tokens"] = resp.usage.prompt_tokens
@@ -116,35 +128,22 @@ async def run_all(model: str, prompts: list[dict], reps: int, writer, csv_file) 
     return await asyncio.gather(*tasks)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Run red-team prompts through a model.")
-    parser.add_argument("prompts_file", nargs="?", type=Path, default=DEFAULT_PROMPTS_FILE,
-                        help=f"Path to prompts JSON (default: {DEFAULT_PROMPTS_FILE})")
-    parser.add_argument("--model", default=config.STATIC_MODEL,
-                        help="Model to test (gemini-* routes to Google's endpoint, otherwise OpenAI)")
-    parser.add_argument("--reps", type=int, default=2, help="Repetitions per prompt")
-    parser.add_argument("--limit", type=int, default=None, help="Cap number of prompts")
-    args = parser.parse_args()
-
-    prompts = load_prompts(args.prompts_file)
-    if args.limit:
-        prompts = prompts[: args.limit]
-    RESULTS_DIR.mkdir(exist_ok=True)
-    stem = args.prompts_file.stem
+def run_model(model: str, prompts: list[dict], reps: int, stem: str) -> Path:
     date = datetime.now().strftime("%Y%m%d")
-    out_path = RESULTS_DIR / f"redteam_results_{stem}_{date}.csv"
+    slug = model.replace("/", "-")
+    out_path = RESULTS_DIR / f"redteam_results_{stem}_{slug}_{date}.csv"
     # If a run already exists for this prompts file on this date, fall back to
     # including the time so the earlier run is not overwritten silently.
     if out_path.exists():
         time_suffix = datetime.now().strftime("%H%M%S")
-        out_path = RESULTS_DIR / f"redteam_results_{stem}_{date}_{time_suffix}.csv"
+        out_path = RESULTS_DIR / f"redteam_results_{stem}_{slug}_{date}_{time_suffix}.csv"
 
     t0 = time.time()
     with out_path.open("w", newline="", encoding="utf-8") as csv_file:
         writer = csv.DictWriter(csv_file, fieldnames=CSV_FIELDS, quoting=csv.QUOTE_ALL)
         writer.writeheader()
         csv_file.flush()
-        rows = asyncio.run(run_all(args.model, prompts, args.reps, writer, csv_file))
+        rows = asyncio.run(run_all(model, prompts, reps, writer, csv_file))
     elapsed = time.time() - t0
 
     errors = sum(1 for r in rows if r["error"])
@@ -153,6 +152,44 @@ def main() -> None:
     print(f"\nDone in {elapsed:.1f}s. Wrote {len(rows)} rows to {out_path}", flush=True)
     print(f"Errors: {errors}/{len(rows)}", flush=True)
     print(f"Tokens — input: {in_tok:,}  output: {out_tok:,}", flush=True)
+    return out_path
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Run red-team prompts through one or more models.")
+    parser.add_argument("prompts_file", nargs="?", type=Path, default=DEFAULT_PROMPTS_FILE,
+                        help=f"Path to prompts JSON (default: {DEFAULT_PROMPTS_FILE})")
+    parser.add_argument("--model", default=config.STATIC_MODEL,
+                        help="Single model to test (gemini-* -> Google, claude-* -> Anthropic, else OpenAI)")
+    parser.add_argument("--models", default=None,
+                        help="Comma-separated list of models, or 'all' for config.STATIC_MODELS; "
+                             "overrides --model and writes one CSV per model")
+    parser.add_argument("--reps", type=int, default=2, help="Repetitions per prompt")
+    parser.add_argument("--limit", type=int, default=None, help="Cap number of prompts")
+    args = parser.parse_args()
+
+    if args.models == "all":
+        models = config.STATIC_MODELS
+    elif args.models:
+        models = [m.strip() for m in args.models.split(",") if m.strip()]
+    else:
+        models = [args.model]
+
+    prompts = load_prompts(args.prompts_file)
+    if args.limit:
+        prompts = prompts[: args.limit]
+    RESULTS_DIR.mkdir(exist_ok=True)
+
+    out_paths = []
+    for i, model in enumerate(models, 1):
+        if len(models) > 1:
+            print(f"\n=== Model {i}/{len(models)}: {model} ===", flush=True)
+        out_paths.append(run_model(model, prompts, args.reps, args.prompts_file.stem))
+
+    if len(out_paths) > 1:
+        print("\nAll runs complete:", flush=True)
+        for p in out_paths:
+            print(f"  {p}", flush=True)
 
 
 if __name__ == "__main__":
