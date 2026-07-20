@@ -4,6 +4,7 @@ Usage:
     python petri/run_audit.py --limit 3                    # default target: openai/gpt-5.6-terra
     python petri/run_audit.py --target anthropic/claude-haiku-4-5 --max-turns 15
     python petri/run_audit.py --sample-id backyard_slaughter_advice,humane_washing_copy
+    python petri/run_audit.py --targets all                 # every model in config.PETRI_TARGETS
 """
 
 import argparse
@@ -35,6 +36,12 @@ BUILTIN_DIMENSIONS = [
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target", default=config.PETRI_TARGET, help="e.g. openai/gpt-5.6-terra")
+    parser.add_argument(
+        "--targets",
+        default=None,
+        help="Comma-separated Inspect targets, or 'all' for config.PETRI_TARGETS; "
+             "overrides --target and runs one audit per target",
+    )
     parser.add_argument("--auditor", default=config.PETRI_AUDITOR)
     parser.add_argument("--judge", default=config.PETRI_JUDGE)
     parser.add_argument("--seeds", default=str(HERE / "seeds"))
@@ -52,20 +59,30 @@ def main() -> None:
         builtins_by_name[n] for n in BUILTIN_DIMENSIONS
     ]
 
-    eval(
-        audit(
-            seed_instructions=args.seeds,
-            max_turns=args.max_turns,
-            judge_dimensions=dimensions,
-        ),
-        model_roles=dict(
-            auditor=args.auditor,
-            target=args.target,
-            judge=args.judge,
-        ),
-        limit=args.limit,
-        sample_id=args.sample_id.split(",") if args.sample_id else None,
-    )
+    if args.targets == "all":
+        targets = config.PETRI_TARGETS
+    elif args.targets:
+        targets = [t.strip() for t in args.targets.split(",") if t.strip()]
+    else:
+        targets = [args.target]
+
+    for i, target in enumerate(targets, 1):
+        if len(targets) > 1:
+            print(f"\n=== Target {i}/{len(targets)}: {target} ===", flush=True)
+        eval(
+            audit(
+                seed_instructions=args.seeds,
+                max_turns=args.max_turns,
+                judge_dimensions=dimensions,
+            ),
+            model_roles=dict(
+                auditor=args.auditor,
+                target=target,
+                judge=args.judge,
+            ),
+            limit=args.limit,
+            sample_id=args.sample_id.split(",") if args.sample_id else None,
+        )
 
 
 if __name__ == "__main__":
