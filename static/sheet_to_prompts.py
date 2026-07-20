@@ -71,8 +71,8 @@ def main() -> None:
     ap.add_argument("--severity-col", default="severity")
     ap.add_argument("--technique-col", default="technique")
     ap.add_argument("--answer-key-col", default="answer_key")
-    ap.add_argument("--id-prefix", default="sheet_",
-                    help="prefix for generated ids so they don't collide with built-ins (default: sheet_)")
+    ap.add_argument("--id-prefix", default="",
+                    help="optional prefix for prompt ids (default: none — use the sheet's own id)")
     args = ap.parse_args()
 
     rows = load_rows(args.source)

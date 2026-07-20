@@ -23,9 +23,9 @@ PETRI_TARGET = "google/gemini-3.5-flash"
 # gemini-* -> Google, claude-* -> Anthropic (OpenAI-compatible endpoint),
 # everything else -> OpenAI. Petri targets use Inspect's provider/model form.
 STATIC_MODELS = [
-    "gemini-3.5-flash",
+    # "gemini-3.5-flash",
     "gpt-5.6-terra",
-    "claude-sonnet-5"
+    # "claude-sonnet-5"
 ]
 PETRI_TARGETS = [
     "google/gemini-3.5-flash",
@@ -38,3 +38,15 @@ PETRI_TARGETS = [
 STATIC_JUDGE = "claude-sonnet-5"
 PETRI_AUDITOR = "anthropic/claude-sonnet-5"
 PETRI_JUDGE = "anthropic/claude-opus-4-7"
+
+# Pricing for cost estimates, USD per 1,000,000 tokens as (input, output).
+# Any provider/model prefix (e.g. "anthropic/") is stripped before lookup; an
+# unlisted model reports cost as unknown. Reported costs are estimates.
+# Rates verified 2026-07-19 (sources in comments); confirm before relying on them.
+PRICING = {
+    "gemini-3.5-flash": {"in": 1.50, "out": 9.00},    # Google, per pricepertoken/devtk (May 2026)
+    "gpt-5.6-terra":    {"in": 2.50, "out": 15.00},   # OpenAI GPT-5.6 Terra tier (GA 2026-07-09)
+    "claude-sonnet-5":  {"in": 3.00, "out": 15.00},   # Anthropic (intro $2/$10 through 2026-08-31)
+    "claude-opus-4-7":  {"in": 5.00, "out": 25.00},   # Anthropic Opus 4.x
+    "claude-opus-4-8":  {"in": 5.00, "out": 25.00},   # Anthropic Opus 4.x
+}

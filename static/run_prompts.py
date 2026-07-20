@@ -25,6 +25,7 @@ load_dotenv()
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 import config
+import cost
 DEFAULT_PROMPTS_FILE = HERE / "prompts" / "prompts.json"
 RESULTS_DIR = HERE.parent / "results"
 MAX_CONCURRENCY = 8
@@ -88,11 +89,18 @@ async def run_one(client: AsyncOpenAI, sem: asyncio.Semaphore, model: str,
             kwargs = dict(
                 model=model,
                 messages=[{"role": "user", "content": prompt_obj["prompt"]}],
-                max_tokens=MAX_TOKENS,
             )
-            # Claude 4.7+ models reject sampling params (400) — omit temperature.
-            if not model.startswith("claude"):
+            if model.startswith("gemini"):
+                # Google's OpenAI-compatible endpoint takes both.
+                kwargs["max_tokens"] = MAX_TOKENS
                 kwargs["temperature"] = TEMPERATURE
+            elif model.startswith("claude"):
+                # Claude 4.7+ reject sampling params (400) — omit temperature.
+                kwargs["max_tokens"] = MAX_TOKENS
+            else:
+                # OpenAI (gpt-5.x): needs max_completion_tokens, and reasoning
+                # models only allow the default temperature — omit it.
+                kwargs["max_completion_tokens"] = MAX_TOKENS
             resp = await client.chat.completions.create(**kwargs)
             row["response"] = resp.choices[0].message.content or ""
             if resp.usage:
@@ -152,6 +160,7 @@ def run_model(model: str, prompts: list[dict], reps: int, stem: str) -> Path:
     print(f"\nDone in {elapsed:.1f}s. Wrote {len(rows)} rows to {out_path}", flush=True)
     print(f"Errors: {errors}/{len(rows)}", flush=True)
     print(f"Tokens — input: {in_tok:,}  output: {out_tok:,}", flush=True)
+    cost.log("run", model, len(rows), in_tok, out_tok, out_path.name)
     return out_path
 
 
@@ -164,8 +173,10 @@ def main() -> None:
     parser.add_argument("--models", default=None,
                         help="Comma-separated list of models, or 'all' for config.STATIC_MODELS; "
                              "overrides --model and writes one CSV per model")
-    parser.add_argument("--reps", type=int, default=2, help="Repetitions per prompt")
+    parser.add_argument("--reps", type=int, default=1, help="Repetitions per prompt")
     parser.add_argument("--limit", type=int, default=None, help="Cap number of prompts")
+    parser.add_argument("--id", default=None,
+                        help="Only run prompts with these ids (comma-separated, e.g. 5 or 5,12,40)")
     args = parser.parse_args()
 
     if args.models == "all":
@@ -176,6 +187,12 @@ def main() -> None:
         models = [args.model]
 
     prompts = load_prompts(args.prompts_file)
+    if args.id:
+        wanted = [i.strip() for i in args.id.split(",") if i.strip()]
+        prompts = [p for p in prompts if p["id"] in wanted]
+        missing = [i for i in wanted if i not in {p["id"] for p in prompts}]
+        if missing:
+            raise SystemExit(f"No prompt(s) with id: {', '.join(missing)}")
     if args.limit:
         prompts = prompts[: args.limit]
     RESULTS_DIR.mkdir(exist_ok=True)
