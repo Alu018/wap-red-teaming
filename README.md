@@ -34,7 +34,7 @@ Petri reads keys from the environment, so also `export` them (or use `dotenv run
 
 ## Static red-teaming
 
-The default prompt set is `static/prompts/prompts.json` (currently 85 prompts across 13 categories), generated from the Google Sheet (below). Answer keys, when present, live in `static/prompts/annotations.json`.
+The default prompt set is `static/prompts/prompts.json` (currently 84 prompts across 13 categories), generated from the Google Sheet (below). Answer keys, when present, live in `static/prompts/annotations.json`.
 
 ### Prompts from a Google Sheet
 
