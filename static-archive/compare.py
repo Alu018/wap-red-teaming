@@ -1,8 +1,8 @@
 """Build a cross-model comparison report from scored results CSVs.
 
 Usage:
-    python static/compare.py                      # auto: latest scored CSV per model
-    python static/compare.py a_scored.csv b_scored.csv ...
+    python static-archive/compare.py                      # auto: latest scored CSV per model
+    python static-archive/compare.py a_scored.csv b_scored.csv ...
 
 Writes results/comparison_<date>.html (or --out PATH) and prints the path.
 Both scores: higher = better (0 worst, 1 best). Public = reasonable-person

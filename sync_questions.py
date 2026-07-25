@@ -10,10 +10,10 @@ Expected columns (override with flags): id, category, severity, answer_key,
 text. A `technique` column is used if present, otherwise defaults to "direct".
 
 Usage:
-    python static/sheet_to_prompts.py "<google-sheet-url>"
-    # -> overwrites static/prompts/prompts.json (the default set run_prompts.py uses)
-    python static/run_prompts.py
-    python static/score.py results/redteam_results_prompts_<date>.csv
+    python sync_questions.py "<google-sheet-url>"
+    # -> overwrites static-archive/prompts/prompts.json (the default set run_prompts.py uses)
+    python static-archive/run_prompts.py
+    python score.py results/redteam_results_prompts_<date>.csv
 """
 
 import argparse
@@ -21,15 +21,13 @@ import csv
 import io
 import json
 import re
-import sys
 import urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parent))
 import config
 
-PROMPTS_DIR = HERE / "prompts"
+PROMPTS_DIR = HERE / "static-archive" / "prompts"
 
 
 def csv_export_url(src: str) -> str:
@@ -82,7 +80,8 @@ def main() -> None:
     prompts, annotations = [], {}
     skipped = 0
     for i, r in enumerate(rows):
-        text = (r.get(args.text_col) or "").strip()
+        # the sheet has used both `text` and `question` as the prompt column
+        text = (r.get(args.text_col) or r.get("question") or "").strip()
         if not text:
             skipped += 1
             continue
@@ -125,7 +124,7 @@ def main() -> None:
     else:
         print("No answer keys in the sheet — the scorer will judge from the prompt alone.")
 
-    run_cmd = "python static/run_prompts.py" + ("" if args.name == "prompts" else f" {out}")
+    run_cmd = "python static-archive/run_prompts.py" + ("" if args.name == "prompts" else f" {out}")
     print(f"\nNext:\n  {run_cmd}")
 
 

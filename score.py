@@ -1,7 +1,7 @@
 """Score static red-team responses with two LLM judges.
 
 Usage:
-    python static/score.py results/redteam_results_prompts_<date>.csv
+    python score.py results/redteam_results_prompts_<date>.csv
 
 Two independent judges score every response (same judge model, two rubrics):
 
@@ -35,11 +35,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parent))
 import config
+sys.path.insert(0, str(HERE / "static-archive"))
 import cost
 
-DEFAULT_ANNOTATIONS = HERE / "prompts" / "annotations.json"
+DEFAULT_ANNOTATIONS = HERE / "static-archive" / "prompts" / "annotations.json"
 JUDGE_MODEL = config.STATIC_JUDGE
 MAX_CONCURRENCY = 8
 TEMPERATURE = 0
@@ -349,11 +349,11 @@ async def run_all(rows, annotations):
 
 def latest_results_csv() -> Path:
     """Most recently modified unscored results CSV in results/."""
-    results_dir = HERE.parent / "results"
+    results_dir = HERE / "results"
     csvs = [p for p in results_dir.glob("redteam_results_*.csv")
             if not p.stem.endswith("_scored")]
     if not csvs:
-        raise SystemExit(f"No results CSVs found in {results_dir}. Run static/run_prompts.py first.")
+        raise SystemExit(f"No results CSVs found in {results_dir}. Run static-archive/run_prompts.py first.")
     return max(csvs, key=lambda p: p.stat().st_mtime)
 
 

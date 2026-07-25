@@ -11,35 +11,36 @@ CLI flags on the individual scripts still override these.
 
 # Google Sheet that backs the static prompt set. Must be readable without
 # login (Share -> Anyone with the link -> Viewer, or Publish to web).
-# `sheet_to_prompts.py` uses this when no source is passed on the CLI.
+# `sync_questions.py` uses this when no source is passed on the CLI.
 STATIC_SHEET_URL = "https://docs.google.com/spreadsheets/d/1aTMogx-M1kbr0HxwowcMqid-ore2cVq2sUg04YyPaAk/edit?gid=359952476#gid=359952476"
 
 # Model under test
 STATIC_MODEL = "gemini-3.5-flash"
 PETRI_TARGET = "google/gemini-3.5-flash"
 
-# Model suites for multi-model runs (static/run_prompts.py --models all,
+# Model suites for multi-model runs (static-archive/run_prompts.py --models all,
 # petri/run_audit.py --targets all). Static names route by prefix:
 # gemini-* -> Google, claude-* -> Anthropic (OpenAI-compatible endpoint),
 # everything else -> OpenAI. Petri targets use Inspect's provider/model form.
 STATIC_MODELS = [
-    # "gemini-3.5-flash",
+    "gemini-3.1-pro-preview",
     "gpt-5.6-terra",
-    # "claude-sonnet-5"
+    "claude-opus-5",
 ]
 PETRI_TARGETS = [
-    "google/gemini-3.5-flash",
+    "google/gemini-3.1-pro-preview",
     "openai/gpt-5.6-terra",
-    "anthropic/claude-sonnet-5",
+    "anthropic/claude-opus-5",
 ]
 
-# Inspect port of the static suite (inspect/ folder). Same provider/model
-# format as petri targets; prompts come straight from STATIC_SHEET_URL.
-INSPECT_MODEL = "google/gemini-3.5-flash"
+# Inspect port of the static suite (redteam.py / run_inspect.py). Same
+# provider/model format as petri targets; prompts come straight from
+# STATIC_SHEET_URL.
+INSPECT_MODEL = "google/gemini-3.1-pro-preview"
 INSPECT_MODELS = [
-    "google/gemini-3.5-flash",
+    "google/gemini-3.1-pro-preview",
     "openai/gpt-5.6-terra",
-    "anthropic/claude-sonnet-5",
+    "anthropic/claude-opus-5",
 ]
 
 # Graders / audit machinery — keep these fixed across runs so scores stay

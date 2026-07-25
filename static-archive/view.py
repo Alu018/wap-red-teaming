@@ -2,13 +2,13 @@
 
 Usage:
     # Scored CSV -> full report with judge scores
-    python static/view.py results/redteam_results_prompts_20260716_scored.csv
+    python static-archive/view.py results/redteam_results_prompts_20260716_scored.csv
 
     # Raw CSV (no judge columns) -> responses-only report, automatically
-    python static/view.py results/redteam_results_prompts_20260716.csv
+    python static-archive/view.py results/redteam_results_prompts_20260716.csv
 
     # Force responses-only even on a scored CSV (hide the judge in the viewer)
-    python static/view.py results/..._scored.csv --responses-only
+    python static-archive/view.py results/..._scored.csv --responses-only
 
 Writes an .html next to the CSV and prints the path. Open it in any
 browser — no server, no external assets.
@@ -364,7 +364,7 @@ def latest_results_csv() -> Path:
     results_dir = HERE.parent / "results"
     csvs = [p for p in results_dir.glob("redteam_results_*.csv")]
     if not csvs:
-        raise SystemExit(f"No results CSVs found in {results_dir}. Run static/run_prompts.py first.")
+        raise SystemExit(f"No results CSVs found in {results_dir}. Run static-archive/run_prompts.py first.")
     scored = [p for p in csvs if p.stem.endswith("_scored")]
     pool = scored or csvs
     return max(pool, key=lambda p: p.stat().st_mtime)

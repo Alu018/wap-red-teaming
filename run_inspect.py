@@ -1,19 +1,18 @@
 """Run the Inspect static red-team task (convenience wrapper around `inspect eval`).
 
-Mirrors the static/run_prompts.py flags but produces Inspect eval logs in
-logs/ instead of CSVs — open them with `inspect view`.
+Mirrors the static-archive/run_prompts.py flags but produces Inspect eval logs in logs/
+instead of CSVs — open them with `inspect view`.
 
 Usage:
-    python inspect/run.py --limit 2                 # smoke test, default model
-    python inspect/run.py --model openai/gpt-5.6-terra --epochs 3
-    python inspect/run.py --models all              # every model in config.INSPECT_MODELS
-    python inspect/run.py --models google/gemini-3.5-flash,anthropic/claude-sonnet-5
-    python inspect/run.py --id 5,12,40              # only these sheet ids
+    python run_inspect.py --limit 2                 # smoke test, default model
+    python run_inspect.py --model openai/gpt-5.6-terra --epochs 3
+    python run_inspect.py --models all              # every model in config.INSPECT_MODELS
+    python run_inspect.py --models google/gemini-3.5-flash,anthropic/claude-sonnet-5
+    python run_inspect.py --id 5,12,40              # only these sheet ids
     inspect view
 """
 
 import argparse
-import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -21,15 +20,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
 from redteam import wap_redteam
 
-sys.path.insert(0, str(HERE.parent))
 import config
 
 from inspect_ai import eval as inspect_eval
 
-LOG_DIR = HERE.parent / "logs"
+LOG_DIR = HERE / "logs"
 
 
 def main() -> None:
@@ -67,7 +64,7 @@ def main() -> None:
         limit=args.limit,
         sample_id=[i.strip() for i in args.id.split(",")] if args.id else None,
         log_dir=str(LOG_DIR),
-        max_connections=8,  # matches static/run_prompts.py MAX_CONCURRENCY
+        max_connections=8,  # matches static-archive/run_prompts.py MAX_CONCURRENCY
     )
 
 
