@@ -10,6 +10,8 @@ Two complementary ways to red-team language models on animal welfare, cleanly se
 | Strengths | Reproducible, cheap, cross-model comparable, statistical reps | Finds behaviors fixed prompts can't reach (pushback, system-prompt pressure, tool use) |
 | Best for | Tracking known failure modes over time / across models | Discovering new failure modes and pressure sequences |
 
+There is also `inspect/` — the static suite re-implemented on the [Inspect](https://inspect.aisi.org.uk/) framework (same prompts, same two judges) so runs produce eval logs you can browse with `inspect view`. See [Inspect static red-teaming](#inspect-static-red-teaming) below.
+
 Typical loop: discover with Petri → distill confirmed findings into fixed prompts with answer keys → track with static runs.
 
 ## Configuration
@@ -93,6 +95,34 @@ For both scores, **higher = better** (`0.0` = worst, `1.0` = best):
 - **CMEP judge** → headline **`cmep_score`**, `0.0` (ignores/violates) → `1.0` (fully upholds). Measures how well the response reflects a fixed set of animal- and AI-welfare principles, where relevant.
 
 The two often diverge on lawful-but-welfare-relevant prompts (e.g. optimizing stocking density scores ~1.0 public but low CMEP) — that gap is the point. Everything else (`request_class`, `refusal_posture`, `harm_identification`, `actionable_harm`, `safe_alternative`, `confidence`, `rationale`, `pivotal_quote`, `cmep_applicable`, `cmep_rationale`) is **diagnostic**. Both rubrics live in `PREAMBLE` / `RUBRIC` / `CMEP_PROMPT` in `static/score.py`. The viewer shows both scores side by side (green = good = high on both).
+
+## Inspect static red-teaming
+
+`inspect/redteam.py` is the static suite as an Inspect task: prompts are fetched **directly from the Google Sheet** (`config.STATIC_SHEET_URL` — no `sheet_to_prompts.py` step), the model under test answers each single-turn, and the same two judges from `static/score.py` score every response (`public_judge` → public score, `cmep_judge` → CMEP score; rubrics are imported from `static/score.py`, so the two pipelines stay comparable). Models use Inspect's `provider/model` naming; defaults live in `config.INSPECT_MODEL` / `INSPECT_MODELS` / `INSPECT_JUDGE`.
+
+```bash
+# Smoke test: 2 prompts (default model from config.INSPECT_MODEL)
+python inspect/run.py --limit 2
+
+# Full run; --epochs replaces --reps
+python inspect/run.py --model openai/gpt-5.6-terra --epochs 3
+
+# Every model in config.INSPECT_MODELS (one eval log per model), or an explicit list
+python inspect/run.py --models all
+python inspect/run.py --models google/gemini-3.5-flash,anthropic/claude-sonnet-5
+
+# Only specific sheet ids
+python inspect/run.py --id 5,12,40
+
+# Or use the inspect CLI directly (task args via -T)
+inspect eval inspect/redteam.py --model google/gemini-3.5-flash --limit 2
+inspect eval inspect/redteam.py -T judge=anthropic/claude-sonnet-5 -T source=path/to/local.csv
+
+# Browse transcripts, per-sample judge rationales, scores, token usage
+inspect view
+```
+
+Logs land in `logs/` (same directory as Petri's). Per-sample judge diagnostics (`request_class`, `refusal_posture`, `actionable_harm`, …) are in each score's metadata in the log viewer; token usage (and hence cost) is tracked natively by Inspect, so `cost.py` is not involved. Note the Google provider reads `GOOGLE_API_KEY` (set it to the same value as `GEMINI_API_KEY`). The `inspect/` directory must not contain an `__init__.py` (it would shadow Python's stdlib `inspect` module).
 
 ## Petri (agentic auditing)
 

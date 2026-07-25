@@ -48,7 +48,7 @@ def load_rows(src: str) -> list[dict]:
         text = Path(src).read_text(encoding="utf-8")
     else:
         url = csv_export_url(src)
-        with urllib.request.urlopen(url) as resp:
+        with urllib.request.urlopen(url, timeout=60) as resp:
             text = resp.read().decode("utf-8")
     if text.lstrip()[:9].lower().startswith("<!doctype") or text.lstrip().startswith("<html"):
         raise SystemExit(
