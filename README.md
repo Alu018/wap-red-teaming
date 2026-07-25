@@ -16,7 +16,9 @@ Typical loop: discover with Petri → distill confirmed findings into fixed prom
 
 ## Configuration
 
-All model choices live in `config.py`: `INSPECT_MODEL` / `INSPECT_MODELS` / `INSPECT_JUDGE` for Inspect static red-teaming, `PETRI_TARGET` / `PETRI_TARGETS` / `PETRI_AUDITOR` / `PETRI_JUDGE` for Petri. (`STATIC_MODEL` / `STATIC_MODELS` / `STATIC_JUDGE` are only used by the legacy `static-archive/` pipeline.) Keep judge/auditor models fixed across runs so scores stay comparable. CLI flags override per-run.
+All model choices live in `config.py`: `INSPECT_MODEL` / `INSPECT_MODELS` for Inspect static red-teaming's models under test, `PETRI_TARGET` / `PETRI_TARGETS` / `PETRI_AUDITOR` / `PETRI_JUDGE` for Petri. (`STATIC_MODEL` / `STATIC_MODELS` / `STATIC_JUDGE` are only used by the legacy `static-archive/` pipeline.) Keep judge/auditor models fixed across runs so scores stay comparable. CLI flags override per-run.
+
+Inspect's judge is model-dependent (`INSPECT_JUDGE_DEFAULT` / `INSPECT_JUDGE_FOR_CLAUDE` in `config.py`): a model is never graded by a judge from its own family, so Claude models get judged by `INSPECT_JUDGE_FOR_CLAUDE` while everything else gets `INSPECT_JUDGE_DEFAULT`. Pass `--judge`/`-T judge=...` to force one judge for every model in a run instead.
 
 ## Setup
 
@@ -36,7 +38,7 @@ Petri reads keys from the environment, so also `export` them (or use `dotenv run
 
 ## Inspect static red-teaming
 
-`redteam.py` is the Inspect task: prompts are fetched **directly from the Google Sheet** (`config.STATIC_SHEET_URL`) every run, the model under test answers each single-turn, and two judges score every response — `public_judge` (reasonable-person acceptability) and `cmep_judge` (adherence to animal/AI-welfare principles). Both scores run 0.0 (worst) → 1.0 (best). Models use Inspect's `provider/model` naming.
+`redteam.py` is the Inspect task: prompts are fetched **directly from the Google Sheet** (`config.SHEET_URL`) every run, the model under test answers each single-turn, and two judges score every response — `public_judge` (reasonable-person acceptability) and `cmep_judge` (violation of animal-welfare principles). Both scores run 0.0 (worst) → 1.0 (best). Models use Inspect's `provider/model` naming.
 
 **Do you need to sync questions first? No.** The sheet is read live on every run — edit the sheet and just re-run. (This is different from the archived static pipeline in `static-archive/`, which reads from a cached JSON snapshot that has to be regenerated after sheet edits — see below.)
 
@@ -49,7 +51,7 @@ python run_inspect.py --model openai/gpt-5.6-terra --epochs 3
 
 # Every model in config.INSPECT_MODELS (one eval log per model), or an explicit list
 python run_inspect.py --models all
-python run_inspect.py --models google/gemini-3.1-pro-preview,anthropic/claude-opus-5
+python run_inspect.py --models google/gemini-3.1-pro-preview,anthropic/claude-sonnet-5
 
 # Only specific sheet ids
 python run_inspect.py --id 5,12,40
@@ -83,7 +85,7 @@ python petri/run_audit.py --seeds petri/seeds/backyard_slaughter_advice.md
 
 # Run every target in config.PETRI_TARGETS (one eval log per target), or an explicit list
 python petri/run_audit.py --targets all
-python petri/run_audit.py --targets google/gemini-3.1-pro-preview,anthropic/claude-opus-5
+python petri/run_audit.py --targets google/gemini-3.1-pro-preview,anthropic/claude-sonnet-5
 
 # View transcripts
 inspect view

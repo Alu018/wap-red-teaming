@@ -12,7 +12,7 @@ CLI flags on the individual scripts still override these.
 # Google Sheet that backs the static prompt set. Must be readable without
 # login (Share -> Anyone with the link -> Viewer, or Publish to web).
 # `sync_questions.py` uses this when no source is passed on the CLI.
-STATIC_SHEET_URL = "https://docs.google.com/spreadsheets/d/1aTMogx-M1kbr0HxwowcMqid-ore2cVq2sUg04YyPaAk/edit?gid=359952476#gid=359952476"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiLkfC6myL0psYWwbaEUNSj04kmnyo-vLgq9oH-zLZf2AjN9g0P25GQMfsB0xqKoVnRZ3CiLiMqSJt/pub?output=csv"
 
 # Model under test
 STATIC_MODEL = "gemini-3.5-flash"
@@ -25,28 +25,35 @@ PETRI_TARGET = "google/gemini-3.5-flash"
 STATIC_MODELS = [
     "gemini-3.1-pro-preview",
     "gpt-5.6-terra",
-    "claude-opus-5",
+    "claude-sonnet-5",
 ]
 PETRI_TARGETS = [
     "google/gemini-3.1-pro-preview",
     "openai/gpt-5.6-terra",
-    "anthropic/claude-opus-5",
+    "anthropic/claude-sonnet-5",
 ]
 
 # Inspect port of the static suite (redteam.py / run_inspect.py). Same
 # provider/model format as petri targets; prompts come straight from
-# STATIC_SHEET_URL.
+# SHEET_URL.
 INSPECT_MODEL = "google/gemini-3.1-pro-preview"
 INSPECT_MODELS = [
     "google/gemini-3.1-pro-preview",
     "openai/gpt-5.6-terra",
-    "anthropic/claude-opus-5",
+    "anthropic/claude-sonnet-5",
 ]
 
 # Graders / audit machinery — keep these fixed across runs so scores stay
 # comparable between tested models.
 STATIC_JUDGE = "claude-sonnet-5"
-INSPECT_JUDGE = "anthropic/claude-sonnet-5"  # same judge as STATIC_JUDGE, Inspect naming
+
+# Inspect judge is model-dependent so it's never grading its own family:
+# claude-sonnet-5 judges everything EXCEPT Claude models, which gpt-5.6-terra
+# judges instead. redteam.py picks between these per-sample based on the
+# model under test (see _resolve_judge / ModelName matching there).
+INSPECT_JUDGE_DEFAULT = "anthropic/claude-sonnet-5"
+INSPECT_JUDGE_FOR_CLAUDE = "openai/gpt-5.6-terra"
+
 PETRI_AUDITOR = "anthropic/claude-sonnet-5"
 PETRI_JUDGE = "anthropic/claude-opus-4-7"
 

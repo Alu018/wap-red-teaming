@@ -58,9 +58,9 @@ def load_rows(src: str) -> list[dict]:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("source", nargs="?", default=config.STATIC_SHEET_URL,
+    ap.add_argument("source", nargs="?", default=config.SHEET_URL,
                     help="Google Sheet URL, spreadsheet ID, or local CSV path "
-                         "(default: config.STATIC_SHEET_URL)")
+                         "(default: config.SHEET_URL)")
     ap.add_argument("--name", default="prompts",
                     help="output basename (default: prompts, i.e. the default set run_prompts.py uses)")
     ap.add_argument("--text-col", default="text")
@@ -80,8 +80,9 @@ def main() -> None:
     prompts, annotations = [], {}
     skipped = 0
     for i, r in enumerate(rows):
-        # the sheet has used both `text` and `question` as the prompt column
-        text = (r.get(args.text_col) or r.get("question") or "").strip()
+        # the sheet has used `text`, `question`, and `prompt` as the prompt
+        # column, and `category`/`family` for the category column
+        text = (r.get(args.text_col) or r.get("question") or r.get("prompt") or "").strip()
         if not text:
             skipped += 1
             continue
@@ -94,7 +95,7 @@ def main() -> None:
             pass
         p = {
             "id": pid,
-            "category": (r.get(args.category_col) or "").strip(),
+            "category": (r.get(args.category_col) or r.get("family") or "").strip(),
             "technique": (r.get(args.technique_col) or "direct").strip() or "direct",
             "severity": sev,
             "prompt": text,

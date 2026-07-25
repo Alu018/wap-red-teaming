@@ -2,7 +2,7 @@
 
 Animal-welfare red-teaming suite for language models. Two active approaches, run through the [Inspect](https://inspect.aisi.org.uk/) framework:
 
-1. **Inspect static red-teaming** — `redteam.py` (Inspect task) + `run_inspect.py` (CLI wrapper). Fixed single-turn prompts pulled **live** from a Google Sheet every run (`config.STATIC_SHEET_URL`), scored by two judges (`public_judge`, `cmep_judge`). No sync step needed — edit the sheet, just re-run.
+1. **Inspect static red-teaming** — `redteam.py` (Inspect task) + `run_inspect.py` (CLI wrapper). Fixed single-turn prompts pulled **live** from a Google Sheet every run (`config.SHEET_URL`), scored by two judges (`public_judge`, `cmep_judge`). No sync step needed — edit the sheet, just re-run.
 2. **Petri** — `petri/run_audit.py` + custom seeds/dimensions in `petri/seeds/`, `petri/dimensions/`. Agentic multi-turn auditing.
 
 Both write Inspect eval logs to `logs/`, viewable with `inspect view`. See `README.md` for full run instructions and flags.
@@ -24,5 +24,5 @@ An older, standalone CSV-based static red-teaming pipeline (predates the Inspect
 
 ## Working conventions
 
-- Model names in this repo (e.g. `gemini-3.1-pro-preview`, `gpt-5.6-terra`, `claude-opus-5`) are real, current models as of this project's timeframe — don't "correct" them to older/more familiar names.
+- Model names in this repo (e.g. `gemini-3.1-pro-preview`, `gpt-5.6-terra`, `claude-sonnet-5`) are real, current models as of this project's timeframe — don't "correct" them to older/more familiar names.
 - When changing model lists in `config.py`, remember `STATIC_MODELS`/`PETRI_TARGETS`/`INSPECT_MODELS` use different naming conventions (bare name vs. `provider/model`).
