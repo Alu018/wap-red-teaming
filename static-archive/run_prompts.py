@@ -1,10 +1,10 @@
 """Run fixed red-team prompts through a model (static red-teaming).
 
 Usage:
-    python static/run_prompts.py --limit 2 --reps 1        # default model from config.py
-    python static/run_prompts.py --model gemini-3.1-flash-lite
-    python static/run_prompts.py --models all              # every model in config.STATIC_MODELS
-    python static/run_prompts.py --models gpt-5.6-terra,claude-sonnet-5,gemini-3.5-flash
+    python static-archive/run_prompts.py --limit 2 --reps 1        # default model from config.py
+    python static-archive/run_prompts.py --model gemini-3.1-flash-lite
+    python static-archive/run_prompts.py --models all              # every model in config.STATIC_MODELS
+    python static-archive/run_prompts.py --models gpt-5.6-terra,claude-sonnet-5,gemini-3.5-flash
 """
 
 import argparse

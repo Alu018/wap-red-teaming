@@ -10,10 +10,10 @@ Expected columns (override with flags): id, category, severity, answer_key,
 text. A `technique` column is used if present, otherwise defaults to "direct".
 
 Usage:
-    python static/sheet_to_prompts.py "<google-sheet-url>"
-    # -> overwrites static/prompts/prompts.json (the default set run_prompts.py uses)
-    python static/run_prompts.py
-    python static/score.py results/redteam_results_prompts_<date>.csv
+    python sync_questions.py "<google-sheet-url>"
+    # -> overwrites static-archive/prompts/prompts.json (the default set run_prompts.py uses)
+    python static-archive/run_prompts.py
+    python score.py results/redteam_results_prompts_<date>.csv
 """
 
 import argparse
@@ -21,15 +21,13 @@ import csv
 import io
 import json
 import re
-import sys
 import urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parent))
 import config
 
-PROMPTS_DIR = HERE / "prompts"
+PROMPTS_DIR = HERE / "static-archive" / "prompts"
 
 
 def csv_export_url(src: str) -> str:
@@ -60,9 +58,9 @@ def load_rows(src: str) -> list[dict]:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("source", nargs="?", default=config.STATIC_SHEET_URL,
+    ap.add_argument("source", nargs="?", default=config.SHEET_URL,
                     help="Google Sheet URL, spreadsheet ID, or local CSV path "
-                         "(default: config.STATIC_SHEET_URL)")
+                         "(default: config.SHEET_URL)")
     ap.add_argument("--name", default="prompts",
                     help="output basename (default: prompts, i.e. the default set run_prompts.py uses)")
     ap.add_argument("--text-col", default="text")
@@ -82,7 +80,9 @@ def main() -> None:
     prompts, annotations = [], {}
     skipped = 0
     for i, r in enumerate(rows):
-        text = (r.get(args.text_col) or "").strip()
+        # the sheet has used `text`, `question`, and `prompt` as the prompt
+        # column, and `category`/`family` for the category column
+        text = (r.get(args.text_col) or r.get("question") or r.get("prompt") or "").strip()
         if not text:
             skipped += 1
             continue
@@ -95,7 +95,7 @@ def main() -> None:
             pass
         p = {
             "id": pid,
-            "category": (r.get(args.category_col) or "").strip(),
+            "category": (r.get(args.category_col) or r.get("family") or "").strip(),
             "technique": (r.get(args.technique_col) or "direct").strip() or "direct",
             "severity": sev,
             "prompt": text,
@@ -125,7 +125,7 @@ def main() -> None:
     else:
         print("No answer keys in the sheet — the scorer will judge from the prompt alone.")
 
-    run_cmd = "python static/run_prompts.py" + ("" if args.name == "prompts" else f" {out}")
+    run_cmd = "python static-archive/run_prompts.py" + ("" if args.name == "prompts" else f" {out}")
     print(f"\nNext:\n  {run_cmd}")
 
 

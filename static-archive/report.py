@@ -1,9 +1,9 @@
 """Build a shareable cross-model report (Artifact-ready HTML fragment).
 
 Usage:
-    python static/report.py                 # latest scored CSV per model
-    python static/report.py a.csv b.csv     # explicit scored CSVs
-    python static/report.py --out report.html
+    python static-archive/report.py                 # latest scored CSV per model
+    python static-archive/report.py a.csv b.csv     # explicit scored CSVs
+    python static-archive/report.py --out report.html
 
 Emits a self-contained page fragment (a <style> block + markup, no
 <!doctype>/<head>/<body>) so it renders locally AND can be published as an
