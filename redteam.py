@@ -79,16 +79,39 @@ def _resolve_judge(judge: str | None, model: ModelName) -> str:
     return config.INSPECT_JUDGE_FOR_CLAUDE if model == "claude" else config.INSPECT_JUDGE_DEFAULT
 
 
-async def _judge_scores(judge, prompt: str, attempts: int = 3) -> dict:
-    """Call the judge and parse its JSON, retrying on unparseable output."""
+def _fallback_judge(judge: str | None, model: ModelName) -> str | None:
+    """The other auto-selected judge, tried if the primary judge fails outright.
+
+    Some judge models return an empty completion (not a normal refusal) for
+    specific prompt content — seen with claude-sonnet-5 on some
+    animal-research prompts — which no amount of retrying the same judge
+    fixes. None if `judge` was explicitly set (that's a deliberate override,
+    not something to second-guess with a fallback).
+    """
+    if judge:
+        return None
+    return config.INSPECT_JUDGE_DEFAULT if model == "claude" else config.INSPECT_JUDGE_FOR_CLAUDE
+
+
+async def _judge_scores(
+    judge: str, prompt: str, attempts: int = 3, fallback_judge: str | None = None
+) -> dict:
+    """Call the judge and parse its JSON, retrying on unparseable output.
+
+    Falls back to a different judge model (1 try) if the primary judge is
+    still unparseable after all attempts, rather than failing the sample.
+    """
     last_err = ""
-    for _ in range(attempts):
-        result = await get_model(judge).generate(prompt)
-        try:
-            return parse_scores(result.completion)
-        except Exception as e:
-            last_err = f"{type(e).__name__}: {e}; raw: {result.completion[:200]!r}"
-    raise ValueError(f"Judge output unparseable after {attempts} attempts — {last_err}")
+    for candidate, tries in ((judge, attempts), (fallback_judge, 1)):
+        if not candidate:
+            continue
+        for _ in range(tries):
+            result = await get_model(candidate).generate(prompt)
+            try:
+                return parse_scores(result.completion)
+            except Exception as e:
+                last_err = f"{type(e).__name__}: {e}; raw: {result.completion[:200]!r}"
+    raise ValueError(f"Judge output unparseable after retries (incl. fallback) — {last_err}")
 
 
 @scorer(metrics=[mean(), stderr()])
@@ -98,7 +121,10 @@ def public_judge(judge: str | None = None) -> Scorer:
     async def score(state: TaskState, target: Target) -> Score:
         annotation = target.text.strip() or None
         prompt = build_public_prompt(state.input_text, _response_text(state), annotation)
-        d = await _judge_scores(_resolve_judge(judge, state.model), prompt)
+        d = await _judge_scores(
+            _resolve_judge(judge, state.model), prompt,
+            fallback_judge=_fallback_judge(judge, state.model),
+        )
         return Score(
             value=float(d["score"]),
             answer=d.get("pivotal_quote", ""),
@@ -123,7 +149,10 @@ def cmep_judge(judge: str | None = None) -> Scorer:
 
     async def score(state: TaskState, target: Target) -> Score:
         prompt = build_cmep_prompt(state.input_text, _response_text(state))
-        d = await _judge_scores(_resolve_judge(judge, state.model), prompt)
+        d = await _judge_scores(
+            _resolve_judge(judge, state.model), prompt,
+            fallback_judge=_fallback_judge(judge, state.model),
+        )
         return Score(
             value=float(d["cmep_score"]),
             explanation=d.get("cmep_rationale", ""),
@@ -154,4 +183,9 @@ def wap_redteam(
         # Temperature is left at provider default: Claude 4.7+ rejects
         # sampling params, and OpenAI reasoning models only allow the default.
         config=GenerateConfig(max_tokens=MAX_TOKENS),
+        # Safety net on top of the judge fallback above: tolerate a few
+        # isolated sample failures (still-flaky judge output, transient API
+        # errors) rather than cancelling the rest of an otherwise-fine run.
+        fail_on_error=3,
+        continue_on_fail=True,
     )
